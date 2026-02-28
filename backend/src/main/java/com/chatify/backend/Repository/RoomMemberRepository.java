@@ -19,7 +19,7 @@ public interface RoomMemberRepository extends JpaRepository<RoomMember,Long> {
     List<RoomMember> findByUserId(Long userId);
 
     // Check if a user is already a member of a room
-    boolean existsByRoomIdAndUserId(Long roomId, Long userId);
+    boolean existsByRoomIdAndUserId(String roomId, Long userId);
 
     // Check if a user is an admin of a room
     boolean existsByRoomIdAndUserIdAndType(Long roomId, Long userId,

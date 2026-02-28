@@ -67,10 +67,10 @@ public class ChatRoomController {
     @PostMapping("/{roomId}/members/{targetUserId}")
     public ResponseEntity<?> addMember(@PathVariable Long roomId, @PathVariable Long targetUserId, @AuthenticationPrincipal UserDetails userDetails)
     {
-        ChatRoom room = new ChatRoom();
-        room.setId(roomId);
+        ChatRoom room = chatRoomRepository.findById(roomId)
+                .orElseThrow(() -> new ResourceNotFoundException("Room not found"));
         User user = userRepository.findById(targetUserId).orElseThrow(()->new RuntimeException("User not found"));
-        chatRoomService.addMember(room, user, MemberType.MEMBER);
+        chatRoomService.addMember(room, user, MemberType.MEMBER, userDetails.getUsername());
         return ResponseEntity.ok("Member added");
     }
     // Soft delete a room
@@ -100,7 +100,7 @@ public class ChatRoomController {
                 .orElseThrow();
 
         if (!roomMemberRepository.existsByRoomIdAndUserId(
-                roomId, user.getId())) {
+                String.valueOf(roomId), user.getId())) {
             throw new UnauthorizedException(
                     "You are not a member of this room");
         }
