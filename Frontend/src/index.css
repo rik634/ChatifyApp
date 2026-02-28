@@ -1,0 +1,36 @@
+@import "tailwindcss";
+
+@theme {
+  /* This creates the 'border' color utility for Tailwind v4 */
+  --color-border: var(--border);
+}
+
+@layer base {
+  :root {
+    /* Define the actual color value for your border here */
+    --border: #e5e7eb; /* Standard gray-200 color */
+  }
+
+  * {
+    /* Now Tailwind knows what 'border-border' means */
+    @apply border-border;
+  }
+  
+  body {
+    @apply bg-gray-50 text-gray-900;
+  }
+}
+
+@layer components {
+  .chat-scrollbar::-webkit-scrollbar {
+    @apply w-2;
+  }
+  
+  .chat-scrollbar::-webkit-scrollbar-track {
+    @apply bg-gray-100 rounded;
+  }
+  
+  .chat-scrollbar::-webkit-scrollbar-thumb {
+    @apply bg-gray-300 rounded hover:bg-gray-400;
+  }
+}
