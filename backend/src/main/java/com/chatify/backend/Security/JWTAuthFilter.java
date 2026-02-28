@@ -4,6 +4,8 @@ import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -18,8 +20,11 @@ import java.io.IOException;
 @Component
 public class JWTAuthFilter extends OncePerRequestFilter {
 
+    private static final Logger logger = LoggerFactory.getLogger(JWTAuthFilter.class);
+
     @Autowired
     private JwtUtil jwtUtil;
+
     @Autowired
     private UserDetailsService userDetailsService;
 
@@ -29,47 +34,39 @@ public class JWTAuthFilter extends OncePerRequestFilter {
                                     FilterChain filterChain)
             throws ServletException, IOException {
 
-        // Step 1: Extract the Authorization header
         String authHeader = request.getHeader("Authorization");
 
-        // Step 2: If no token or wrong format, skip this filter
+        // If no token, just move to the next filter
         if (authHeader == null || !authHeader.startsWith("Bearer ")) {
             filterChain.doFilter(request, response);
             return;
         }
 
-        // Step 3: Extract token (remove "Bearer " prefix)
         String token = authHeader.substring(7);
 
-        // Step 4: Extract email from token subject
-        String email = jwtUtil.extractUsername(token);
+        try {
+            String email = jwtUtil.extractUsername(token);
 
-        // Step 5: If email found and not already authenticated
-        if (email != null &&
-                SecurityContextHolder.getContext().getAuthentication() == null) {
+            if (email != null && SecurityContextHolder.getContext().getAuthentication() == null) {
+                UserDetails userDetails = userDetailsService.loadUserByUsername(email);
 
-            // Step 6: Load user from database by email
-            UserDetails userDetails = userDetailsService.loadUserByUsername(email);
-
-            // Step 7: Validate token — compare email from token to email used to load user
-            if (jwtUtil.isTokenValid(token, email)) { // ✅ was: userDetails.getUsername() which returns "john_doe", not email
-
-                // Step 8: Set authentication in Spring's security context
-                UsernamePasswordAuthenticationToken authToken =
-                        new UsernamePasswordAuthenticationToken(
-                                userDetails,
-                                null,
-                                userDetails.getAuthorities()
-                        );
-                authToken.setDetails(
-                        new WebAuthenticationDetailsSource()
-                                .buildDetails(request)
-                );
-                SecurityContextHolder.getContext().setAuthentication(authToken);
+                if (jwtUtil.isTokenValid(token, email)) {
+                    UsernamePasswordAuthenticationToken authToken =
+                            new UsernamePasswordAuthenticationToken(
+                                    userDetails,
+                                    null,
+                                    userDetails.getAuthorities()
+                            );
+                    authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+                    SecurityContextHolder.getContext().setAuthentication(authToken);
+                }
             }
+        } catch (Exception e) {
+            // This prevents the SignatureException from crashing the registration flow
+            logger.error("JWT validation failed: {}", e.getMessage());
         }
 
-        // Step 9: Continue to next filter
+        // Final call to ensure the request continues regardless of JWT status
         filterChain.doFilter(request, response);
     }
 }
