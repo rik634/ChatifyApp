@@ -10,7 +10,7 @@ import org.springframework.stereotype.Repository;
 import java.time.OffsetDateTime;
 import java.util.List;
 @Repository
-public interface MessageRepository extends MongoRepository<Message,Long> {
+public interface MessageRepository extends MongoRepository<Message,String> {
 
     // Fetch message history for a room, newest last
     List<Message> findByRoomIdAndIsDeletedFalseOrderByTimestampAsc(String roomId);

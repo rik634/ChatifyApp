@@ -26,6 +26,7 @@ public class Message {
     private String senderName;
     private String senderAvatarUrl;
 
+    private String senderEmail;
     private String content;
 
     @Enumerated(EnumType.STRING)
