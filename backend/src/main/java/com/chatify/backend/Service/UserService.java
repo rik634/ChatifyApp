@@ -3,6 +3,7 @@ package com.chatify.backend.Service;
 import com.chatify.backend.DTO.AuthResponse;
 import com.chatify.backend.DTO.LoginRequest;
 import com.chatify.backend.DTO.RegisterRequest;
+import com.chatify.backend.DTO.UserResponse;
 import com.chatify.backend.Entity.User;
 import com.chatify.backend.Exception.ConflictException;
 import com.chatify.backend.Exception.ResourceNotFoundException;
@@ -13,6 +14,10 @@ import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.util.List;
+import java.util.stream.Collectors;
 
 @Service
 public class UserService {
@@ -26,6 +31,14 @@ public class UserService {
     @Autowired
     private AuthenticationManager authenticationManager;
 
+    @Transactional(readOnly = true)
+    public List<UserResponse> getAllUsers() {
+        return userRepository.findAll().stream()
+                .map(UserResponse::from)
+                .collect(Collectors.toList());
+    }
+
+    @Transactional
     public AuthResponse register(RegisterRequest request) {
 
         // Check if email already exists
@@ -53,6 +66,7 @@ public class UserService {
         return AuthResponse.of(token, saved);
     }
 
+    @Transactional(readOnly = true)
     public AuthResponse login(LoginRequest request) {
 
         // Spring Security validates credentials against database

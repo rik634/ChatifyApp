@@ -68,7 +68,7 @@ public class SecurityConfig {
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
         config.setAllowedOriginPatterns(List.of(
-                "http://localhost:3000",
+                "http://localhost:5173",
                 "https://*.vercel.app",
                 "https://chatify.vercel.app"
         ));

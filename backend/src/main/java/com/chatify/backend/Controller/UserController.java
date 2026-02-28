@@ -4,6 +4,7 @@ package com.chatify.backend.Controller;
 import com.chatify.backend.DTO.UserResponse;
 import com.chatify.backend.Entity.User;
 import com.chatify.backend.Exception.ResourceNotFoundException;
+import com.chatify.backend.Service.UserService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -20,6 +21,14 @@ public class UserController {
 
     @Autowired
     private UserRepository userRepository;
+
+    @Autowired
+    private UserService userService;
+    @GetMapping
+    public ResponseEntity<List<UserResponse>> getAllUsers()
+    {
+        return ResponseEntity.ok(userService.getAllUsers());
+    }
 
     // Get current logged-in user's profile
     @GetMapping("/me")

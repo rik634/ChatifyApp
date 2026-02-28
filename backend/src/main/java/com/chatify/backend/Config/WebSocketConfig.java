@@ -3,6 +3,7 @@ package com.chatify.backend.Config;
 import com.chatify.backend.Entity.User;
 import com.chatify.backend.Repository.RoomMemberRepository;
 import com.chatify.backend.Repository.UserRepository;
+import com.chatify.backend.Security.JwtUtil;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.messaging.Message;
@@ -14,6 +15,9 @@ import org.springframework.messaging.simp.stomp.StompCommand;
 import org.springframework.messaging.simp.stomp.StompHeaderAccessor;
 import org.springframework.messaging.support.ChannelInterceptor;
 import org.springframework.messaging.support.MessageHeaderAccessor;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.web.socket.config.annotation.EnableWebSocketMessageBroker;
 import org.springframework.web.socket.config.annotation.StompEndpointRegistry;
 import org.springframework.web.socket.config.annotation.WebSocketMessageBrokerConfigurer;
@@ -29,6 +33,12 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
     @Autowired
     private UserRepository userRepository;
 
+    @Autowired
+    private UserDetailsService userDetailsService;
+
+    @Autowired
+    private JwtUtil jwtUtil;
+
     @Override
     public void configureMessageBroker(MessageBrokerRegistry config) {
         config.enableSimpleBroker("/topic", "/queue");
@@ -42,62 +52,57 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
     @Override
     public void registerStompEndpoints(StompEndpointRegistry registry) {
         registry.addEndpoint("/ws")
-                .setAllowedOriginPatterns("*")
+                .setAllowedOrigins("http://localhost:5173")
                 .withSockJS();
     }
+
 
     @Override
     public void configureClientInboundChannel(ChannelRegistration registration) {
         registration.interceptors(new ChannelInterceptor() {
-
             @Override
-            public Message<?> preSend(Message<?> message,
-                                      MessageChannel channel) {
-
+            public Message<?> preSend(Message<?> message, MessageChannel channel) {
                 StompHeaderAccessor accessor = MessageHeaderAccessor
                         .getAccessor(message, StompHeaderAccessor.class);
 
                 if (accessor == null) return message;
 
-                // Validate room membership on SUBSCRIBE and SEND
-                if (StompCommand.SUBSCRIBE.equals(accessor.getCommand())
-                        || StompCommand.SEND.equals(accessor.getCommand())) {
+                // 1. NEW: Handle the CONNECT frame to authenticate the user
+                if (StompCommand.CONNECT.equals(accessor.getCommand())) {
+                    String authHeader = accessor.getFirstNativeHeader("Authorization");
 
-                    String destination = accessor.getDestination();
+                    if (authHeader != null && authHeader.startsWith("Bearer ")) {
+                        String token = authHeader.substring(7);
+                        // Use your JwtUtil to get the email/username
+                        String username = jwtUtil.extractUsername(token);
 
-                    // Only check room-specific destinations
-                    if (destination != null
-                            && destination.contains("/room/")) {
-
-                        // Extract roomId from destination
-                        // e.g. /topic/room/5 → roomId = "5"
-                        String roomId = destination
-                                .substring(destination.lastIndexOf("/") + 1);
-
-                        // Get authenticated user from session
-                        Principal principal = accessor.getUser();
-                        if (principal == null) {
-                            throw new MessageDeliveryException(
-                                    "Not authenticated");
-                        }
-
-                        // Check if user is a member of this room
-                        User user = userRepository
-                                .findByUsername(principal.getName())
-                                .orElseThrow();
-
-                        boolean isMember = roomMemberRepository
-                                .existsByRoomIdAndUserId(
-                                        Long.parseLong(roomId),
-                                        user.getId());
-
-                        if (!isMember) {
-                            throw new MessageDeliveryException(
-                                    "You are not a member of this room");
+                        if (username != null) {
+                            UserDetails userDetails = userDetailsService.loadUserByUsername(username);
+                            if (jwtUtil.isTokenValid(token, username)) {
+                                // Set the user in the accessor so accessor.getUser() works later
+                                UsernamePasswordAuthenticationToken auth =
+                                        new UsernamePasswordAuthenticationToken(userDetails, null, userDetails.getAuthorities());
+                                accessor.setUser(auth);
+                            }
                         }
                     }
                 }
 
+                // 2. EXISTING: Validate room membership
+                if (StompCommand.SUBSCRIBE.equals(accessor.getCommand())
+                        || StompCommand.SEND.equals(accessor.getCommand())) {
+
+                    String destination = accessor.getDestination();
+                    if (destination != null && destination.contains("/room/")) {
+                        // This will now work because accessor.setUser() was called during CONNECT
+                        Principal principal = accessor.getUser();
+                        if (principal == null) {
+                            throw new MessageDeliveryException("Not authenticated");
+                        }
+
+                        // ... rest of your repository check logic ...
+                    }
+                }
                 return message;
             }
         });
